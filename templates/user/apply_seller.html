@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block title %}申请成为卖家 - 二手图书交易平台{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="form-container">
+        <h2>申请成为卖家</h2>
+        <p>填写以下信息申请成为认证卖家，提供真实有效的信息以便审核。</p>
+        
+        <form method="POST">
+            <div class="form-group">
+                <label for="real_name">真实姓名 *</label>
+                <input type="text" id="real_name" name="real_name" class="form-control" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="id_number">身份证号码 *</label>
+                <input type="text" id="id_number" name="id_number" class="form-control" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="phone">联系电话 *</label>
+                <input type="tel" id="phone" name="phone" class="form-control" required>
+            </div>
+            
+            <button type="submit" class="btn btn-primary btn-block">提交申请</button>
+        </form>
+        
+        <div class="mt-3">
+            <a href="{{ url_for('user.buyer_center') }}">返回买家中心</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

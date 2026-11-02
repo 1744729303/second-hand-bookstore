@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}二手图书交易平台{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <a href="{{ url_for('main.index') }}" class="logo">📚 二手图书交易</a>
+            <ul class="nav-menu">
+                <li><a href="{{ url_for('main.index') }}">首页</a></li>
+                <li><a href="{{ url_for('books.list_books') }}">浏览书籍</a></li>
+                <li><a href="{{ url_for('books.ai_assistant') }}">🤖 AI选书助手</a></li>
+                {% if current_user.is_authenticated %}
+                    {% if current_user.is_admin %}
+                        <li class="nav-dropdown">
+                            <a href="{{ url_for('admin.dashboard') }}" class="nav-dropdown-toggle">管理面板 ▾</a>
+                            <ul class="nav-dropdown-menu">
+                                <li><a href="{{ url_for('admin.dashboard') }}">数据看板</a></li>
+                                <li><a href="{{ url_for('admin.books_management') }}">书籍管理</a></li>
+                                <li><a href="{{ url_for('admin.users_management') }}">用户管理</a></li>
+                                <li><a href="{{ url_for('admin.orders_management') }}">订单管理</a></li>
+                            </ul>
+                        </li>
+                        <li><a href="{{ url_for('auth.logout') }}">退出</a></li>
+                    {% elif current_user.is_verified_seller %}
+                        <li><a href="{{ url_for('books.publish') }}">发布书籍</a></li>
+                        <li><a href="{{ url_for('user.seller_center') }}">卖家中心</a></li>
+                        <li><a href="{{ url_for('user.buyer_center') }}">个人中心</a></li>
+                        <li><a href="{{ url_for('auth.logout') }}">退出 ({{ current_user.username }})</a></li>
+                    {% else %}
+                        <li><a href="{{ url_for('user.buyer_center') }}">个人中心</a></li>
+                        <li><a href="{{ url_for('auth.logout') }}">退出 ({{ current_user.username }})</a></li>
+                    {% endif %}
+                {% else %}
+                    <li><a href="{{ url_for('auth.login') }}">登录</a></li>
+                    <li><a href="{{ url_for('auth.register') }}">注册</a></li>
+                {% endif %}
+            </ul>
+        </div>
+    </nav>
+
+    <div class="container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flash-messages">
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }}">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </div>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2026 二手图书交易平台 - 毕业设计项目</p>
+        </div>
+    </footer>
+    {% block scripts %}{% endblock %}
+
+    <style>
+    /* 下拉菜单样式 */
+    .nav-dropdown {
+        position: relative;
+    }
+    .nav-dropdown-toggle {
+        cursor: pointer;
+        user-select: none;
+    }
+    .nav-dropdown-menu {
+        display: none;
+        position: absolute;
+        top: calc(100% + 8px);
+        left: 50%;
+        transform: translateX(-50%);
+        background: #fff;
+        border-radius: 8px;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+        list-style: none;
+        padding: 6px 0;
+        min-width: 130px;
+        z-index: 1000;
+    }
+    .nav-dropdown-menu::before {
+        content: '';
+        position: absolute;
+        top: -6px;
+        left: 50%;
+        transform: translateX(-50%);
+        border: 6px solid transparent;
+        border-top: 0;
+        border-bottom-color: #fff;
+    }
+    .nav-dropdown-menu li a {
+        display: block;
+        padding: 8px 18px;
+        color: #2c3e50 !important;
+        text-decoration: none;
+        font-size: 0.9rem;
+        white-space: nowrap;
+        transition: background 0.2s;
+    }
+    .nav-dropdown-menu li a:hover {
+        background: #f1f5f9;
+        color: #4f46e5 !important;
+        opacity: 1 !important;
+    }
+    .nav-dropdown:hover .nav-dropdown-menu,
+    .nav-dropdown.open .nav-dropdown-menu {
+        display: block;
+    }
+    </style>
+
+    <script>
+    // 点击切换下拉，同时支持敢在外面关闭
+    (function() {
+        var dropdown = document.querySelector('.nav-dropdown');
+        if (!dropdown) return;
+        var toggle = dropdown.querySelector('.nav-dropdown-toggle');
+        toggle.addEventListener('click', function(e) {
+            e.preventDefault();
+            dropdown.classList.toggle('open');
+        });
+        document.addEventListener('click', function(e) {
+            if (!dropdown.contains(e.target)) {
+                dropdown.classList.remove('open');
+            }
+        });
+    })();
+    </script>
+</body>
+</html>

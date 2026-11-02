@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+
+{% block title %}买家中心 - 二手图书交易平台{% endblock %}
+
+{% block content %}
+<!-- 卖家认证状态区域 -->
+<div class="seller-status-card">
+    {% if current_user.user_type == 'seller' and not current_user.is_verified_seller %}
+        <div class="status-pending-review">
+            <h3>📋 卖家认证申请状态</h3>
+            <p>您的卖家认证申请正在审核中，请耐心等待管理员处理。</p>
+            <span class="badge badge-pending">待审核</span>
+        </div>
+    {% elif not current_user.is_verified_seller %}
+        <div class="seller-application">
+            <h3>🏪 成为卖家</h3>
+            <p>认证成为卖家后，您可以发布二手书籍进行销售</p>
+            <ul>
+                <li>发布书籍出售</li>
+                <li>管理已发布的书籍</li>
+                <li>查看销售订单</li>
+            </ul>
+            <a href="{{ url_for('user.apply_seller') }}" class="btn btn-primary">申请成为卖家</a>
+        </div>
+    {% endif %}
+</div>
+
+<h2>我的购买记录</h2>
+
+{% if transactions %}
+<table class="data-table">
+    <thead>
+        <tr>
+            <th>书籍</th>
+            <th>价格</th>
+            <th>状态</th>
+            <th>留言</th>
+            <th>卖家回复</th>
+            <th>申请时间</th>
+            <th>操作</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for trans in transactions %}
+        <tr>
+            <td>
+                <a href="{{ url_for('books.detail', book_id=trans.book.id) }}">{{ trans.book.title }}</a>
+                <br><small>卖家：{{ trans.book.seller.username }}</small>
+            </td>
+            <td>¥{{ "%.2f"|format(trans.book.price) }}</td>
+            <td>
+                {% if trans.status == 'pending' %}
+                    <span class="status-pending">待处理</span>
+                {% elif trans.status == 'accepted' %}
+                    <span class="status-accepted">已同意-待付款</span>
+                {% elif trans.status == 'paid' %}
+                    <span class="status-paid">已付款</span>
+                {% elif trans.status == 'rejected' %}
+                    <span class="status-rejected">已拒绝</span>
+                {% endif %}
+            </td>
+            <td>{{ trans.message or '-' }}</td>
+            <td>{{ trans.seller_reply or '-' }}</td>
+            <td>{{ trans.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+            <td>
+                {% if trans.status == 'accepted' %}
+                    {% set price_text = '%.2f'|format(trans.book.price) %}
+                    <form method="POST" action="{{ url_for('transactions.pay', transaction_id=trans.id) }}" style="display: inline;" onsubmit="return confirm('确认支付 ¥{{ price_text }} 吗？')">
+                        <button type="submit" class="btn btn-small btn-primary">立即付款</button>
+                    </form>
+                {% elif trans.status == 'paid' %}
+                    <span class="text-success">✓ 交易完成</span>
+                    {% if trans.paid_at %}
+                    <br><small>付款时间：{{ trans.paid_at.strftime('%Y-%m-%d %H:%M') }}</small>
+                    {% endif %}
+                {% else %}
+                    -
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p>您还没有购买记录</p>
+{% endif %}
+
+<style>
+.seller-status-card {
+    background: white;
+    border-radius: 10px;
+    padding: 25px;
+    margin-bottom: 30px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.seller-application {
+    text-align: center;
+}
+
+.seller-application h3 {
+    margin-bottom: 10px;
+    color: #333;
+}
+
+.seller-application p {
+    color: #666;
+    margin-bottom: 15px;
+}
+
+.seller-application ul {
+    list-style: none;
+    padding: 0;
+    margin-bottom: 20px;
+    text-align: left;
+    display: inline-block;
+}
+
+.seller-application li {
+    padding: 5px 0;
+    color: #555;
+}
+
+.seller-application li::before {
+    content: "✓ ";
+    color: #10b981;
+    font-weight: bold;
+    margin-right: 8px;
+}
+
+.status-pending-review {
+    text-align: center;
+    background: #fffbeb;
+    border: 1px solid #fcd34d;
+    border-radius: 8px;
+    padding: 20px;
+}
+
+.status-pending-review h3 {
+    color: #92400e;
+    margin-bottom: 10px;
+}
+
+.status-pending-review p {
+    color: #b45309;
+    margin-bottom: 15px;
+}
+
+.badge {
+    display: inline-block;
+    padding: 8px 20px;
+    border-radius: 20px;
+    font-weight: bold;
+    font-size: 14px;
+}
+
+.badge-pending {
+    background: #fcd34d;
+    color: #92400e;
+}
+</style>
+
+{% if recommendations %}
+<div class="recommendations-section">
+    <h3>为您推荐</h3>
+    <div class="book-grid">
+        {% for rec_book in recommendations %}
+        <div class="book-card">
+            {% if rec_book.photo_paths %}
+                {% set photos = rec_book.photo_paths.split(',') %}
+                {% if photos %}
+                    <img src="{{ url_for('static', filename=photos[0]) }}" alt="{{ rec_book.title }}">
+                {% else %}
+                    <div class="book-placeholder">📖</div>
+                {% endif %}
+            {% else %}
+                <div class="book-placeholder">📖</div>
+            {% endif %}
+            <h4>{{ rec_book.title }}</h4>
+            <p class="author">{{ rec_book.author }}</p>
+            <p class="price">¥{{ "%.2f"|format(rec_book.price) }}</p>
+            <a href="{{ url_for('books.detail', book_id=rec_book.id) }}" class="btn btn-small">查看详情</a>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+{% endblock %}

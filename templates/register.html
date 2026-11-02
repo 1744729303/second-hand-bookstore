@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+
+{% block title %}注册 - 二手图书交易平台{% endblock %}
+
+{% block content %}
+<div class="form-container">
+    <h2>用户注册</h2>
+    <form method="POST">
+        <div class="form-group">
+            <label for="username">用户名 *</label>
+            <input type="text" id="username" name="username" required>
+        </div>
+        
+        <div class="form-group">
+            <label for="email">邮箱 *</label>
+            <input type="email" id="email" name="email" required>
+        </div>
+        
+        <div class="form-group">
+            <label for="password">密码 *</label>
+            <input type="password" id="password" name="password" required>
+        </div>
+        
+        <div class="form-group">
+            <label for="confirm_password">确认密码 *</label>
+            <input type="password" id="confirm_password" name="confirm_password" required>
+        </div>
+        
+        <div class="form-group">
+            <label>
+                <input type="checkbox" id="apply_seller" name="apply_seller" onchange="toggleSellerFields()">
+                申请成为认证卖家
+            </label>
+        </div>
+        
+        <div id="seller_fields" style="display: none;">
+            <div class="form-group">
+                <label for="real_name">真实姓名 *</label>
+                <input type="text" id="real_name" name="real_name">
+            </div>
+            
+            <div class="form-group">
+                <label for="id_number">身份证号 *</label>
+                <input type="text" id="id_number" name="id_number">
+            </div>
+            
+            <div class="form-group">
+                <label for="phone">联系电话 *</label>
+                <input type="text" id="phone" name="phone">
+            </div>
+        </div>
+        
+        <button type="submit" class="btn btn-primary">注册</button>
+        <p class="form-footer">已有账号？ <a href="{{ url_for('auth.login') }}">立即登录</a></p>
+    </form>
+</div>
+
+<script>
+function toggleSellerFields() {
+    const checkbox = document.getElementById('apply_seller');
+    const fields = document.getElementById('seller_fields');
+    const inputs = fields.querySelectorAll('input');
+    
+    if (checkbox.checked) {
+        fields.style.display = 'block';
+        inputs.forEach(input => input.required = true);
+    } else {
+        fields.style.display = 'none';
+        inputs.forEach(input => {
+            input.required = false;
+            input.value = '';
+        });
+    }
+}
+</script>
+{% endblock %}

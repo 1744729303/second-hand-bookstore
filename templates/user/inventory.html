@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block title %}库存管理 - 二手图书交易平台{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h2>📦 库存管理</h2>
+    
+    <div class="mb-4">
+        <a href="{{ url_for('books.publish') }}" class="btn btn-primary">发布新书籍</a>
+        <a href="{{ url_for('user.seller_center') }}" class="btn btn-secondary">返回卖家中心</a>
+    </div>
+    
+    {% if books %}
+    <div class="table-responsive">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>书籍</th>
+                    <th>作者</th>
+                    <th>价格</th>
+                    <th>库存数量</th>
+                    <th>状态</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for book in books %}
+                <tr>
+                    <td>
+                        {% if book.photo_paths %}
+                            {% set photos = book.photo_paths.split(',') %}
+                            {% if photos %}
+                                <img src="{{ url_for('static', filename=photos[0]) }}" alt="{{ book.title }}" style="width: 50px; height: 50px; object-fit: cover;">
+                            {% endif %}
+                        {% else %}
+                            <div style="width: 50px; height: 50px; background-color: #ccc; display: flex; align-items: center; justify-content: center;">暂无图片</div>
+                        {% endif %}
+                        <div>{{ book.title }}</div>
+                    </td>
+                    <td>{{ book.author }}</td>
+                    <td>¥{{ "%.2f"|format(book.price) }}</td>
+                    <td>
+                        <form method="POST" action="{{ url_for('books.update_stock', book_id=book.id) }}" style="display: inline;">
+                            <input type="number" name="stock_quantity" value="{{ book.stock_quantity }}" min="0" style="width: 70px; display: inline;">
+                            <button type="submit" class="btn btn-sm btn-outline-primary">更新</button>
+                        </form>
+                    </td>
+                    <td>
+                        <span class="badge 
+                            {% if book.status == 'available' %}badge-success
+                            {% elif book.status == 'sold' %}badge-danger
+                            {% elif book.status == 'offline' %}badge-secondary
+                            {% endif %}">
+                            {% if book.status == 'available' %}在售
+                            {% elif book.status == 'sold' %}已售出
+                            {% elif book.status == 'offline' %}已下架
+                            {% else %}{{ book.status }}
+                            {% endif %}
+                        </span>
+                    </td>
+                    <td>
+                        <a href="{{ url_for('books.edit', book_id=book.id) }}" class="btn btn-sm btn-outline-primary">编辑</a>
+                        <a href="{{ url_for('books.detail', book_id=book.id) }}" class="btn btn-sm btn-outline-info">详情</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="alert alert-info">
+        <p>您还没有发布任何书籍。</p>
+        <a href="{{ url_for('books.publish') }}" class="btn btn-primary">立即发布</a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,241 @@
+{% extends "base.html" %}
+
+{% block title %}AI 课程用书助手 - 二手图书交易平台{% endblock %}
+
+{% block content %}
+<div class="ai-assistant-container">
+    <div class="ai-header">
+        <h2>🤖 AI 课程用书助手</h2>
+        <p>输入课程名称，我为你推荐合适的二手教材</p>
+    </div>
+
+    <div class="ai-chat-box" id="chat-box">
+        <div class="message ai-message">
+            <div class="message-content">
+                你好！我是你的课程用书助手。请告诉我你想找什么课程的书籍？例如：“数据结构”、“高等数学”或“Python编程”。
+            </div>
+        </div>
+    </div>
+
+    <div class="ai-input-area">
+        <form id="assistant-form" onsubmit="return false;">
+            <input type="text" id="course-input" placeholder="输入课程名称..." required>
+            <button type="submit" id="send-btn">发送</button>
+        </form>
+    </div>
+</div>
+
+<style>
+    .ai-assistant-container {
+        max-width: 800px;
+        margin: 40px auto;
+        background: white;
+        border-radius: 10px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        display: flex;
+        flex-direction: column;
+        height: 600px;
+    }
+    
+    .ai-header {
+        padding: 20px;
+        border-bottom: 1px solid #eee;
+        background-color: #f8f9fa;
+        border-radius: 10px 10px 0 0;
+        text-align: center;
+    }
+    
+    .ai-chat-box {
+        flex: 1;
+        overflow-y: auto;
+        padding: 20px;
+        background-color: #fff;
+    }
+    
+    .message {
+        margin-bottom: 20px;
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .message-content {
+        padding: 12px 18px;
+        border-radius: 15px;
+        max-width: 80%;
+        line-height: 1.5;
+    }
+    
+    .ai-message {
+        align-items: flex-start;
+    }
+    
+    .ai-message .message-content {
+        background-color: #e9ecef;
+        color: #333;
+        border-bottom-left-radius: 5px;
+    }
+    
+    .user-message {
+        align-items: flex-end;
+    }
+    
+    .user-message .message-content {
+        background-color: #007bff;
+        color: white;
+        border-bottom-right-radius: 5px;
+    }
+    
+    .ai-input-area {
+        padding: 20px;
+        border-top: 1px solid #eee;
+        background-color: #f8f9fa;
+        border-radius: 0 0 10px 10px;
+    }
+    
+    #assistant-form {
+        display: flex;
+        gap: 10px;
+    }
+    
+    #course-input {
+        flex: 1;
+        padding: 12px;
+        border: 1px solid #ddd;
+        border-radius: 25px;
+        outline: none;
+    }
+    
+    #course-input:focus {
+        border-color: #007bff;
+    }
+    
+    #send-btn {
+        padding: 0 25px;
+        background-color: #007bff;
+        color: white;
+        border: none;
+        border-radius: 25px;
+        cursor: pointer;
+        font-weight: bold;
+    }
+    
+    #send-btn:hover {
+        background-color: #0056b3;
+    }
+    
+    .book-recommendation {
+        margin-top: 10px;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        padding: 10px;
+        background: white;
+        display: flex;
+        gap: 10px;
+    }
+    
+    .book-recommendation img {
+        width: 60px;
+        height: 80px;
+        object-fit: cover;
+    }
+    
+    .book-info h4 {
+        margin: 0 0 5px 0;
+        font-size: 1rem;
+    }
+    
+    .book-info p {
+        margin: 0;
+        font-size: 0.9rem;
+        color: #666;
+    }
+    
+    .book-info .price {
+        color: #e74c3c;
+        font-weight: bold;
+    }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const chatBox = document.getElementById('chat-box');
+    const form = document.getElementById('assistant-form');
+    const input = document.getElementById('course-input');
+
+    function appendMessage(content, isUser) {
+        const msgDiv = document.createElement('div');
+        msgDiv.className = `message ${isUser ? 'user-message' : 'ai-message'}`;
+        
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'message-content';
+        contentDiv.innerHTML = content;
+        
+        msgDiv.appendChild(contentDiv);
+        chatBox.appendChild(msgDiv);
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        const query = input.value.trim();
+        if (!query) return;
+
+        // User message
+        appendMessage(query, true);
+        input.value = '';
+
+        // Show loading
+        const loadingId = 'loading-' + Date.now();
+        appendMessage('<span id="' + loadingId + '">正在思考...</span>', false);
+
+        fetch('/books/assistant-chat', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ query: query })
+        })
+        .then(response => response.json())
+        .then(data => {
+            // Remove loading
+            const loadingEl = document.getElementById(loadingId);
+            if (loadingEl) {
+                loadingEl.parentElement.parentElement.remove();
+            }
+
+            if (data.success) {
+                let responseHtml = data.message;
+                if (data.books && data.books.length > 0) {
+                    responseHtml += '<div class="recommendations">';
+                    data.books.forEach(book => {
+                        let imgHtml = book.image ? `<img src="${book.image}" alt="${book.title}">` : '<div class="book-placeholder" style="width:60px;height:80px;background:#ecf0f1;display:flex;align-items:center;justify-content:center;font-size:1.5rem;">📖</div>';
+                        responseHtml += `
+                            <div class="book-recommendation">
+                                ${imgHtml}
+                                <div class="book-info">
+                                    <h4><a href="/books/${book.id}" target="_blank">${book.title}</a></h4>
+                                    <p>${book.author}</p>
+                                    <p class="price">¥${book.price}</p>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    responseHtml += '</div>';
+                }
+                appendMessage(responseHtml, false);
+            } else {
+                appendMessage('抱歉，我遇到了一些问题，请稍后再试。', false);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            const loadingEl = document.getElementById(loadingId);
+            if (loadingEl) {
+                loadingEl.parentElement.parentElement.remove();
+            }
+            appendMessage('网络错误，请检查连接。', false);
+        });
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,376 @@
+{% extends "base.html" %}
+
+{% block title %}{{ book.title }} - 二手图书交易平台{% endblock %}
+
+{% block content %}
+<div class="book-detail">
+    <!-- 文字描述部分 - 放在上面 -->
+    <div class="detail-info">
+        <h2>{{ book.title }}</h2>
+        <p><strong>作者：</strong>{{ book.author }}</p>
+        {% if book.isbn %}<p><strong>ISBN：</strong>{{ book.isbn }}</p>{% endif %}
+        {% if book.publisher %}<p><strong>出版社：</strong>{{ book.publisher }}</p>{% endif %}
+        {% if book.pages %}<p><strong>页数：</strong>{{ book.pages }}页</p>{% endif %}
+        <p><strong>库存：</strong>{{ book.stock_quantity }}本</p>
+        
+        <p class="price-large">¥{{ "%.2f"|format(book.price) }}</p>
+        
+        <p><strong>新旧程度：</strong>
+            {% if book.condition == 'new' %}全新
+            {% elif book.condition == 'like_new' %}几乎全新
+            {% elif book.condition == 'good' %}良好
+            {% else %}可接受
+            {% endif %}
+        </p>
+        
+        {% if book.ai_assessment_result %}
+        <div class="ai-assessment">
+            <p><strong>🤖 AI成色评估报告：</strong></p>
+            <p class="ai-result-text">{{ book.ai_assessment_result }}</p>
+        </div>
+        {% endif %}
+
+        <p><strong>状态：</strong>
+            {% if book.status == 'available' %}<span class="status-available">在售</span>
+            {% elif book.status == 'sold' %}<span class="status-sold">已售出</span>
+            {% else %}<span class="status-offline">已下架</span>
+            {% endif %}
+        </p>
+        
+        <p><strong>卖家：</strong>{{ book.seller.username }}</p>
+        
+        {% if book.description %}
+        <div class="description">
+            <h3>描述</h3>
+            <p>{{ book.description }}</p>
+        </div>
+        {% endif %}
+        
+        <div class="actions">
+            {% if current_user.is_authenticated %}
+                {% if current_user.id == book.seller_id %}
+                    <a href="{{ url_for('books.edit', book_id=book.id) }}" class="btn btn-secondary">编辑</a>
+                    {% if book.status == 'available' %}
+                        <form method="POST" action="{{ url_for('books.offline', book_id=book.id) }}" style="display: inline;">
+                            <button type="submit" class="btn btn-warning" onclick="return confirm('确定要下架这本书吗？')">下架</button>
+                        </form>
+                    {% endif %}
+                {% elif book.status == 'available' %}
+                    <button class="btn btn-primary" onclick="document.getElementById('purchase-form').style.display='block'">发起购买</button>
+                {% endif %}
+            {% else %}
+                <p><a href="{{ url_for('auth.login') }}">登录</a>后可购买</p>
+            {% endif %}
+        </div>
+        
+        {% if current_user.is_authenticated and current_user.id != book.seller_id and book.status == 'available' %}
+        <div id="purchase-form" style="display: none; margin-top: 20px;">
+            <form method="POST" action="{{ url_for('transactions.purchase', book_id=book.id) }}">
+                <div class="form-group">
+                    <label for="message">给卖家留言（可选）</label>
+                    <textarea id="message" name="message" rows="3" placeholder="可以留下你的联系方式或其他信息"></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary">确认购买</button>
+                <button type="button" class="btn btn-secondary" onclick="document.getElementById('purchase-form').style.display='none'">取消</button>
+            </form>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- 图片轮播部分 - 放在下面 -->
+    <div class="detail-image">
+        {% if book.photo_paths %}
+            {% set photos = book.photo_paths.split(',') %}
+            {% if photos|length > 0 %}
+            <div class="book-carousel">
+                <div class="carousel-main">
+                    <img id="carousel-main-img" src="{{ url_for('static', filename=photos[0]) }}" alt="{{ book.title }}">
+                    <button class="carousel-btn carousel-btn-prev" onclick="changeSlide(-1)">&#10094;</button>
+                    <button class="carousel-btn carousel-btn-next" onclick="changeSlide(1)">&#10095;</button>
+                </div>
+                <div class="carousel-thumbnails">
+                    {% for photo in photos %}
+                    <img src="{{ url_for('static', filename=photo) }}" 
+                         alt="图片{{ loop.index }}" 
+                         class="carousel-thumb {% if loop.index == 1 %}active{% endif %}"
+                         onclick="goToSlide({{ loop.index0 }})">
+                    {% endfor %}
+                </div>
+                <div class="carousel-labels">
+                    {% set labels = ['封面', '扉页', '内页', '封底', '图片5', '图片6', '图片7', '图片8'] %}
+                    {% for photo in photos %}
+                    <span class="carousel-label {% if loop.index == 1 %}active{% endif %}" data-index="{{ loop.index0 }}">{% if loop.index0 < labels|length %}{{ labels[loop.index0] }}{% else %}图片{{ loop.index }}{% endif %}</span>
+                    {% endfor %}
+                </div>
+            </div>
+            {% else %}
+            <div class="book-placeholder-large">📖</div>
+            {% endif %}
+        {% else %}
+            <div class="book-placeholder-large">📖</div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+var currentSlide = 0;
+var totalSlides = {{ book.photo_paths.split(',')|length if book.photo_paths else 0 }};
+
+function changeSlide(direction) {
+    currentSlide += direction;
+    if (currentSlide < 0) currentSlide = totalSlides - 1;
+    if (currentSlide >= totalSlides) currentSlide = 0;
+    updateCarousel();
+}
+
+function goToSlide(index) {
+    currentSlide = index;
+    updateCarousel();
+}
+
+function updateCarousel() {
+    var photos = {{ book.photo_paths.split(',')|tojson if book.photo_paths else '[]' }};
+    if (photos.length > 0) {
+        document.getElementById('carousel-main-img').src = '/static/' + photos[currentSlide];
+        
+        // 更新缩略图状态
+        var thumbs = document.querySelectorAll('.carousel-thumb');
+        thumbs.forEach(function(thumb, idx) {
+            thumb.classList.toggle('active', idx === currentSlide);
+        });
+        
+        // 更新标签状态
+        var labels = document.querySelectorAll('.carousel-label');
+        labels.forEach(function(label, idx) {
+            label.classList.toggle('active', idx === currentSlide);
+        });
+    }
+}
+</script>
+
+<style>
+.book-detail {
+    display: flex;
+    flex-direction: column;
+    gap: 30px;
+}
+
+.detail-info {
+    order: 1;
+}
+
+.detail-image {
+    order: 2;
+    display: flex;
+    justify-content: center;
+}
+
+/* 轮播图样式 */
+.book-carousel {
+    max-width: 500px;
+    width: 100%;
+}
+
+.carousel-main {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 3/4;
+    background: #f5f5f5;
+    border-radius: 10px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.carousel-main img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+
+.carousel-btn {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(0, 0, 0, 0.5);
+    color: white;
+    border: none;
+    padding: 15px 18px;
+    cursor: pointer;
+    border-radius: 50%;
+    font-size: 18px;
+    transition: background 0.3s;
+}
+
+.carousel-btn:hover {
+    background: rgba(0, 0, 0, 0.8);
+}
+
+.carousel-btn-prev {
+    left: 15px;
+}
+
+.carousel-btn-next {
+    right: 15px;
+}
+
+.carousel-thumbnails {
+    display: flex;
+    gap: 10px;
+    margin-top: 15px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.carousel-thumb {
+    width: 60px;
+    height: 60px;
+    object-fit: cover;
+    border-radius: 5px;
+    cursor: pointer;
+    border: 2px solid transparent;
+    opacity: 0.6;
+    transition: all 0.3s;
+}
+
+.carousel-thumb:hover {
+    opacity: 1;
+}
+
+.carousel-thumb.active {
+    border-color: #6366f1;
+    opacity: 1;
+}
+
+.carousel-labels {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.carousel-label {
+    padding: 5px 12px;
+    background: #e5e7eb;
+    border-radius: 15px;
+    font-size: 12px;
+    color: #6b7280;
+    transition: all 0.3s;
+}
+
+.carousel-label.active {
+    background: #6366f1;
+    color: white;
+}
+
+.book-placeholder-large {
+    width: 300px;
+    height: 400px;
+    background: #f5f5f5;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 100px;
+}
+
+.price-large {
+    font-size: 28px;
+    color: #ef4444;
+    font-weight: bold;
+    margin: 15px 0;
+}
+
+.ai-assessment {
+    background: #f0f9ff;
+    border: 1px solid #bae6fd;
+    border-radius: 8px;
+    padding: 15px;
+    margin: 15px 0;
+}
+
+.ai-result-text {
+    color: #0369a1;
+    line-height: 1.6;
+}
+
+.status-available {
+    color: #10b981;
+    font-weight: bold;
+}
+
+.status-sold {
+    color: #ef4444;
+    font-weight: bold;
+}
+
+.status-offline {
+    color: #f59e0b;
+    font-weight: bold;
+}
+
+.description {
+    margin: 20px 0;
+    padding: 15px;
+    background: #f9fafb;
+    border-radius: 8px;
+}
+
+.description h3 {
+    margin-bottom: 10px;
+    font-size: 16px;
+}
+
+.actions {
+    margin-top: 20px;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+@media (min-width: 768px) {
+    .book-detail {
+        flex-direction: row;
+        align-items: flex-start;
+    }
+    
+    .detail-info {
+        flex: 1;
+        order: 1;
+    }
+    
+    .detail-image {
+        flex: 0 0 400px;
+        order: 2;
+    }
+}
+</style>
+
+{% if recommendations %}
+<div class="recommendations-section">
+    <h3>相关推荐</h3>
+    <div class="book-grid">
+        {% for rec_book in recommendations %}
+        <div class="book-card">
+            {% if rec_book.photo_paths %}
+                {% set photos = rec_book.photo_paths.split(',') %}
+                {% if photos %}
+                    <img src="{{ url_for('static', filename=photos[0]) }}" alt="{{ rec_book.title }}">
+                {% else %}
+                    <div class="book-placeholder">📖</div>
+                {% endif %}
+            {% else %}
+                <div class="book-placeholder">📖</div>
+            {% endif %}
+            <h4>{{ rec_book.title }}</h4>
+            <p class="author">{{ rec_book.author }}</p>
+            <p class="price">¥{{ "%.2f"|format(rec_book.price) }}</p>
+            <a href="{{ url_for('books.detail', book_id=rec_book.id) }}" class="btn btn-small">查看详情</a>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+{% endblock %}

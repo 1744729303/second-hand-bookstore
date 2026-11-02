@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+
+{% block title %}书籍交换 - 二手图书交易平台{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h2>🔄 书籍交换</h2>
+    
+    <div class="exchange-section">
+        <h3>我的书籍</h3>
+        <p>选择您想要用来交换的书籍</p>
+        
+        <div class="book-grid">
+            {% for book in my_books %}
+            <div class="book-card exchange-book">
+                {% if book.photo_paths %}
+                    {% set photos = book.photo_paths.split(',') %}
+                    {% if photos %}
+                        <img src="{{ url_for('static', filename=photos[0]) }}" alt="{{ book.title }}">
+                    {% else %}
+                        <div class="book-placeholder">📖</div>
+                    {% endif %}
+                {% else %}
+                    <div class="book-placeholder">📖</div>
+                {% endif %}
+                
+                <h4>{{ book.title }}</h4>
+                <p class="author">{{ book.author }}</p>
+                <p class="price">¥{{ "%.2f"|format(book.price) }}</p>
+                <p class="condition">
+                    {% if book.condition == 'new' %}全新
+                    {% elif book.condition == 'like_new' %}几乎全新
+                    {% elif book.condition == 'good' %}良好
+                    {% else %}可接受
+                    {% endif %}
+                </p>
+                
+                <label class="checkbox-label">
+                    <input type="checkbox" name="my_books" value="{{ book.id }}" onchange="updateSelectedBooks()">
+                    选择作为交换书籍
+                </label>
+            </div>
+            {% else %}
+            <p>您还没有发布任何书籍</p>
+            {% endfor %}
+        </div>
+    </div>
+    
+    <div class="exchange-section">
+        <h3>可交换的书籍</h3>
+        <p>选择您想要交换的书籍</p>
+        
+        <div class="book-grid">
+            {% for book in available_books %}
+            <div class="book-card exchange-book">
+                {% if book.photo_paths %}
+                    {% set photos = book.photo_paths.split(',') %}
+                    {% if photos %}
+                        <img src="{{ url_for('static', filename=photos[0]) }}" alt="{{ book.title }}">
+                    {% else %}
+                        <div class="book-placeholder">📖</div>
+                    {% endif %}
+                {% else %}
+                    <div class="book-placeholder">📖</div>
+                {% endif %}
+                
+                <h4>{{ book.title }}</h4>
+                <p class="author">{{ book.author }}</p>
+                <p class="price">¥{{ "%.2f"|format(book.price) }}</p>
+                <p class="condition">
+                    {% if book.condition == 'new' %}全新
+                    {% elif book.condition == 'like_new' %}几乎全新
+                    {% elif book.condition == 'good' %}良好
+                    {% else %}可接受
+                    {% endif %}
+                </p>
+                
+                <label class="checkbox-label">
+                    <input type="checkbox" name="offer_books" value="{{ book.id }}" onchange="updateSelectedBooks()">
+                    选择作为目标书籍
+                </label>
+            </div>
+            {% else %}
+            <p>暂无可交换的书籍</p>
+            {% endfor %}
+        </div>
+    </div>
+    
+    <form method="POST" action="{{ url_for('transactions.exchange') }}" id="exchange-form" style="display: none;">
+        <input type="hidden" name="book_id" id="selected-my-book" value="">
+        <input type="hidden" name="offer_book_ids" id="selected-offer-books" value="">
+        
+        <div class="form-group">
+            <label for="message">交换留言</label>
+            <textarea id="message" name="message" rows="3" placeholder="您可以在此留下交换条件或联系方式"></textarea>
+        </div>
+        
+        <button type="submit" class="btn btn-primary">发送交换请求</button>
+        <a href="{{ url_for('main.index') }}" class="btn btn-secondary">取消</a>
+    </form>
+    
+    <div id="exchange-summary" style="display: none; margin-top: 20px; padding: 15px; background-color: #f8f9fa; border-radius: 5px;">
+        <h4>交换摘要</h4>
+        <div id="summary-content"></div>
+        <button onclick="submitExchange()" class="btn btn-primary">确认交换</button>
+    </div>
+</div>
+
+<script>
+let selectedMyBook = null;
+let selectedOfferBooks = [];
+
+function updateSelectedBooks() {
+    // 更新选择的我的书籍
+    const myBookCheckboxes = document.querySelectorAll('input[name="my_books"]:checked');
+    if (myBookCheckboxes.length > 0) {
+        selectedMyBook = myBookCheckboxes[0].value; // 只能选择一本书作为交换书籍
+        
+        // 清除其他选项
+        myBookCheckboxes.forEach((box, index) => {
+            if (index > 0) box.checked = false;
+        });
+    } else {
+        selectedMyBook = null;
+    }
+    
+    // 更新选择的目标书籍
+    const offerBookCheckboxes = document.querySelectorAll('input[name="offer_books"]:checked');
+    selectedOfferBooks = Array.from(offerBookCheckboxes).map(box => box.value);
+    
+    // 显示预览
+    if (selectedMyBook && selectedOfferBooks.length > 0) {
+        document.getElementById('exchange-form').style.display = 'block';
+        document.getElementById('exchange-summary').style.display = 'block';
+        
+        // 更新摘要
+        let summaryHtml = `<p><strong>您提供的书籍：</strong>`;
+        const myBookElement = document.querySelector(`input[name="my_books"][value="${selectedMyBook}"]`).closest('.book-card');
+        const myBookTitle = myBookElement.querySelector('h4').textContent;
+        summaryHtml += `${myBookTitle}</p>`;
+        
+        summaryHtml += `<p><strong>您希望交换的书籍：</strong><ul>`;
+        selectedOfferBooks.forEach(bookId => {
+            const offerBookElement = document.querySelector(`input[name="offer_books"][value="${bookId}"]`).closest('.book-card');
+            const offerBookTitle = offerBookElement.querySelector('h4').textContent;
+            summaryHtml += `<li>${offerBookTitle}</li>`;
+        });
+        summaryHtml += `</ul></p>`;
+        
+        document.getElementById('summary-content').innerHTML = summaryHtml;
+        
+        // 更新隐藏字段
+        document.getElementById('selected-my-book').value = selectedMyBook;
+        document.getElementById('selected-offer-books').value = selectedOfferBooks.join(',');
+    } else {
+        document.getElementById('exchange-form').style.display = 'none';
+        document.getElementById('exchange-summary').style.display = 'none';
+    }
+}
+
+function submitExchange() {
+    document.getElementById('exchange-form').submit();
+}
+</script>
+
+<style>
+.exchange-section {
+    margin-bottom: 30px;
+}
+
+.exchange-book {
+    border: 2px solid #ddd;
+    border-radius: 8px;
+    padding: 15px;
+}
+
+.exchange-book.selected {
+    border-color: #007bff;
+    background-color: #f0f8ff;
+}
+
+.checkbox-label {
+    display: block;
+    margin-top: 10px;
+    font-size: 0.9em;
+}
+
+.checkbox-label input[type="checkbox"] {
+    margin-right: 5px;
+}
+</style>
+{% endblock %}

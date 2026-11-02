@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="hero">
+    <h1>欢迎来到二手图书交易平台</h1>
+    <p>买卖二手图书，让知识流转起来</p>
+    <div class="hero-buttons">
+        <a href="{{ url_for('books.list_books') }}" class="btn btn-primary">浏览书籍</a>
+        {% if current_user.is_authenticated and current_user.is_verified_seller %}
+            <a href="{{ url_for('books.publish') }}" class="btn btn-secondary">发布书籍</a>
+        {% elif not current_user.is_authenticated %}
+            <a href="{{ url_for('auth.register') }}" class="btn btn-secondary">立即注册</a>
+        {% endif %}
+    </div>
+</div>
+
+<h2>最新上架</h2>
+<div class="book-grid">
+    {% for book in latest_books %}
+        <div class="book-card">
+            {% if book.photo_paths %}
+                {% set photos = book.photo_paths.split(',') %}
+                {% if photos %}
+                    <img src="{{ url_for('static', filename=photos[0]) }}" alt="{{ book.title }}">
+                {% else %}
+                    <div class="book-placeholder">📖</div>
+                {% endif %}
+            {% else %}
+                <div class="book-placeholder">📖</div>
+            {% endif %}
+            <h3>{{ book.title }}</h3>
+            <p class="author">{{ book.author }}</p>
+            <p class="price">¥{{ "%.2f"|format(book.price) }}</p>
+            <p class="condition">
+                {% if book.condition == 'new' %}全新
+                {% elif book.condition == 'like_new' %}几乎全新
+                {% elif book.condition == 'good' %}良好
+                {% elif book.condition == 'acceptable' %}可接受
+                {% else %}{{ book.condition }}
+                {% endif %}
+            </p>
+            <a href="{{ url_for('books.detail', book_id=book.id) }}" class="btn btn-small">查看详情</a>
+        </div>
+    {% else %}
+        <p>暂无书籍</p>
+    {% endfor %}
+</div>
+{% endblock %}

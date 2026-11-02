@@ -1,0 +1,236 @@
+{% extends "base.html" %}
+
+{% block title %}书籍管理 - 二手图书交易平台{% endblock %}
+
+{% block content %}
+<div class="admin-panel">
+    <h1>📚 书籍管理</h1>
+    
+    <!-- 搜索和筛选 -->
+    <div class="filter-section">
+        <form method="GET" class="filter-form">
+            <div class="form-group">
+                <input type="text" name="search" placeholder="搜索书名或作者..." value="{{ search_query }}" class="form-control">
+            </div>
+            <div class="form-group">
+                <select name="status" class="form-control">
+                    <option value="all" {% if current_status == 'all' %}selected{% endif %}>全部状态</option>
+                    <option value="available" {% if current_status == 'available' %}selected{% endif %}>在售</option>
+                    <option value="sold" {% if current_status == 'sold' %}selected{% endif %}>已售出</option>
+                    <option value="offline" {% if current_status == 'offline' %}selected{% endif %}>已下架</option>
+                </select>
+            </div>
+            <button type="submit" class="btn btn-primary">筛选</button>
+            <a href="{{ url_for('admin.books_management') }}" class="btn btn-secondary">重置</a>
+        </form>
+    </div>
+    
+    <!-- 书籍列表 -->
+    <div class="table-responsive">
+        <table class="admin-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>书名</th>
+                    <th>作者</th>
+                    <th>价格</th>
+                    <th>新旧程度</th>
+                    <th>状态</th>
+                    <th>卖家</th>
+                    <th>发布时间</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for book in books %}
+                <tr>
+                    <td>{{ book.id }}</td>
+                    <td>{{ book.title }}</td>
+                    <td>{{ book.author }}</td>
+                    <td>¥{{ "%.2f"|format(book.price) }}</td>
+                    <td>
+                        {% if book.condition == 'new' %}全新
+                        {% elif book.condition == 'like_new' %}几乎全新
+                        {% elif book.condition == 'good' %}良好
+                        {% else %}可接受
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span class="status-badge status-{{ book.status }}">
+                            {% if book.status == 'available' %}在售
+                            {% elif book.status == 'sold' %}已售出
+                            {% elif book.status == 'offline' %}已下架
+                            {% else %}{{ book.status }}
+                            {% endif %}
+                        </span>
+                    </td>
+                    <td>{{ book.seller.username }}</td>
+                    <td>{{ book.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                    <td>
+                        <div class="dropdown">
+                            <button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button">
+                                更改状态
+                            </button>
+                            <div class="dropdown-menu">
+                                <form method="POST" action="{{ url_for('admin.toggle_book_status', book_id=book.id) }}">
+                                    <input type="hidden" name="status" value="available">
+                                    <button type="submit" class="dropdown-item">设为在售</button>
+                                </form>
+                                <form method="POST" action="{{ url_for('admin.toggle_book_status', book_id=book.id) }}">
+                                    <input type="hidden" name="status" value="sold">
+                                    <button type="submit" class="dropdown-item">设为已售出</button>
+                                </form>
+                                <form method="POST" action="{{ url_for('admin.toggle_book_status', book_id=book.id) }}">
+                                    <input type="hidden" name="status" value="offline">
+                                    <button type="submit" class="dropdown-item">设为下架</button>
+                                </form>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    <!-- 分页 -->
+    {% if pagination.pages > 1 %}
+    <div class="pagination">
+        {% if pagination.has_prev %}
+            <a href="{{ url_for('admin.books_management', page=pagination.prev_num, status=current_status, search=search_query) }}" class="btn btn-outline-secondary">上一页</a>
+        {% endif %}
+        
+        {% for page_num in pagination.iter_pages() %}
+            {% if page_num %}
+                {% if page_num != pagination.page %}
+                    <a href="{{ url_for('admin.books_management', page=page_num, status=current_status, search=search_query) }}" class="btn btn-outline-secondary">{{ page_num }}</a>
+                {% else %}
+                    <span class="btn btn-primary active">{{ page_num }}</span>
+                {% endif %}
+            {% else %}
+                <span class="ellipsis">…</span>
+            {% endif %}
+        {% endfor %}
+        
+        {% if pagination.has_next %}
+            <a href="{{ url_for('admin.books_management', page=pagination.next_num, status=current_status, search=search_query) }}" class="btn btn-outline-secondary">下一页</a>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+
+<style>
+.admin-panel {
+    padding: 20px;
+}
+
+.admin-panel h1 {
+    color: #333;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+.filter-section {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 5px;
+    margin-bottom: 20px;
+}
+
+.filter-form {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.filter-form .form-group {
+    margin-bottom: 0;
+}
+
+.table-responsive {
+    overflow-x: auto;
+}
+
+.admin-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+    border-radius: 5px;
+    overflow: hidden;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.admin-table th,
+.admin-table td {
+    padding: 12px;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+}
+
+.admin-table th {
+    background: #007bff;
+    color: white;
+    font-weight: 600;
+}
+
+.dropdown {
+    position: relative;
+    display: inline-block;
+}
+
+.dropdown-menu {
+    display: none;
+    position: absolute;
+    background-color: white;
+    min-width: 160px;
+    box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+    z-index: 1;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.dropdown:hover .dropdown-menu {
+    display: block;
+}
+
+.dropdown-item {
+    display: block;
+    padding: 8px 16px;
+    text-decoration: none;
+    color: #333;
+    border-bottom: 1px solid #eee;
+}
+
+.dropdown-item:last-child {
+    border-bottom: none;
+}
+
+.dropdown-item:hover {
+    background-color: #f8f9fa;
+}
+
+.pagination {
+    margin-top: 20px;
+    text-align: center;
+    display: flex;
+    justify-content: center;
+    gap: 5px;
+    flex-wrap: wrap;
+}
+
+.pagination .btn {
+    padding: 8px 12px;
+    min-width: 40px;
+}
+
+.pagination .active {
+    pointer-events: none;
+}
+
+.ellipsis {
+    padding: 8px 12px;
+    color: #6c757d;
+}
+</style>
+{% endblock %}

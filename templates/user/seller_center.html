@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+
+{% block title %}卖家中心 - 二手图书交易平台{% endblock %}
+
+{% block content %}
+<h2>卖家中心</h2>
+
+<!-- 销售统计数据 -->
+<div class="stats-section">
+    <div class="stat-card">
+        <h3>💰 总销售额</h3>
+        <p class="stat-value">¥{{ "%.2f"|format(total_sales) }}</p>
+    </div>
+    <div class="stat-card">
+        <h3>📊 已售出</h3>
+        <p class="stat-value">{{ total_books_sold }} 本</p>
+    </div>
+    <div class="stat-card">
+        <h3>📚 在售书籍</h3>
+        <p class="stat-value">{{ books|selectattr('status', 'equalto', 'available')|list|length }} 本</p>
+    </div>
+    <div class="stat-card">
+        <h3>📋 待处理</h3>
+        <p class="stat-value">{{ pending_transactions|length }} 个</p>
+    </div>
+</div>
+
+<div class="seller-section">
+    <h3>待处理的购买请求 ({{ pending_transactions|length }})</h3>
+    {% if pending_transactions %}
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>书籍</th>
+                <th>买家</th>
+                <th>买家留言</th>
+                <th>申请时间</th>
+                <th>操作</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for trans in pending_transactions %}
+            <tr>
+                <td>
+                    <a href="{{ url_for('books.detail', book_id=trans.book.id) }}">{{ trans.book.title }}</a>
+                    <br>¥{{ "%.2f"|format(trans.book.price) }}
+                </td>
+                <td>{{ trans.buyer.username }}</td>
+                <td>{{ trans.message or '-' }}</td>
+                <td>{{ trans.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                <td>
+                    <button class="btn btn-small btn-success" onclick="showReplyForm({{ trans.id }}, 'accept')">同意</button>
+                    <button class="btn btn-small btn-danger" onclick="showReplyForm({{ trans.id }}, 'reject')">拒绝</button>
+                    
+                    <div id="reply-form-{{ trans.id }}" style="display: none; margin-top: 10px;">
+                        <form method="POST" id="action-form-{{ trans.id }}">
+                            <textarea name="seller_reply" placeholder="回复买家（可选）" rows="2" style="width: 100%;"></textarea>
+                            <button type="submit" class="btn btn-small">确认</button>
+                            <button type="button" class="btn btn-small btn-secondary" onclick="hideReplyForm({{ trans.id }})">取消</button>
+                        </form>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p>暂无待处理的购买请求</p>
+    {% endif %}
+</div>
+
+<div class="seller-section">
+    <h3>已处理的购买请求</h3>
+    {% if processed_transactions %}
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>书籍</th>
+                <th>买家</th>
+                <th>状态</th>
+                <th>我的回复</th>
+                <th>处理时间</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for trans in processed_transactions %}
+            <tr>
+                <td>
+                    <a href="{{ url_for('books.detail', book_id=trans.book.id) }}">{{ trans.book.title }}</a>
+                </td>
+                <td>{{ trans.buyer.username }}</td>
+                <td>
+                    {% if trans.status == 'accepted' %}
+                        <span class="status-accepted">已同意-待买家付款</span>
+                    {% elif trans.status == 'paid' %}
+                        <span class="status-paid">✓ 买家已付款</span>
+                    {% else %}
+                        <span class="status-rejected">已拒绝</span>
+                    {% endif %}
+                </td>
+                <td>{{ trans.seller_reply or '-' }}</td>
+                <td>{{ trans.updated_at.strftime('%Y-%m-%d %H:%M') }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p>暂无已处理的请求</p>
+    {% endif %}
+</div>
+
+<div class="seller-section">
+    <h3>我发布的书籍</h3>
+    <a href="{{ url_for('books.publish') }}" class="btn btn-primary">发布新书籍</a>
+    
+    {% if books %}
+    <div class="book-grid" style="margin-top: 20px;">
+        {% for book in books %}
+        <div class="book-card">
+            {% if book.photo_paths %}
+                {% set photos = book.photo_paths.split(',') %}
+                {% if photos %}
+                    <img src="{{ url_for('static', filename=photos[0]) }}" alt="{{ book.title }}">
+                {% else %}
+                    <div class="book-placeholder">📖</div>
+                {% endif %}
+            {% else %}
+                <div class="book-placeholder">📖</div>
+            {% endif %}
+            <h3>{{ book.title }}</h3>
+            <p class="author">{{ book.author }}</p>
+            <p class="price">¥{{ "%.2f"|format(book.price) }}</p>
+            <p class="status">
+                {% if book.status == 'available' %}<span class="status-available">在售</span>
+                {% elif book.status == 'sold' %}<span class="status-sold">已售出</span>
+                {% else %}<span class="status-offline">已下架</span>
+                {% endif %}
+            </p>
+            <a href="{{ url_for('books.detail', book_id=book.id) }}" class="btn btn-small">查看</a>
+            {% if book.status == 'available' %}
+                <a href="{{ url_for('books.edit', book_id=book.id) }}" class="btn btn-small btn-secondary">编辑</a>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p>您还没有发布任何书籍</p>
+    {% endif %}
+</div>
+
+<script>
+function showReplyForm(transId, action) {
+    const form = document.getElementById('action-form-' + transId);
+    const actionUrl = action === 'accept' 
+        ? "{{ url_for('transactions.accept', transaction_id=0) }}".replace('0', transId)
+        : "{{ url_for('transactions.reject', transaction_id=0) }}".replace('0', transId);
+    form.action = actionUrl;
+    document.getElementById('reply-form-' + transId).style.display = 'block';
+}
+
+function hideReplyForm(transId) {
+    document.getElementById('reply-form-' + transId).style.display = 'none';
+}
+</script>
+{% endblock %}

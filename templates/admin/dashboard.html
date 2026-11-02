@@ -1,0 +1,663 @@
+{% extends "base.html" %}
+
+{% block title %}管理员仪表板 - 二手图书交易平台{% endblock %}
+
+{% block content %}
+<div class="admin-dashboard">
+
+    <!-- 核心指标：一行 4 卡片紧凑 -->
+    <div class="metrics-row">
+        <div class="metric-card primary">
+            <span class="metric-value">{{ total_books }}</span>
+            <span class="metric-label">图书总数</span>
+            <span class="metric-extra">本周+{{ new_books_this_week }}</span>
+        </div>
+        <div class="metric-card success">
+            <span class="metric-value">{{ total_users }}</span>
+            <span class="metric-label">用户总数</span>
+            <span class="metric-extra">本周+{{ new_users_this_week }}</span>
+        </div>
+        <div class="metric-card warning">
+            <span class="metric-value">{{ total_transactions }}</span>
+            <span class="metric-label">交易总数</span>
+            <span class="metric-extra">本周{{ transactions_this_week }}笔</span>
+        </div>
+        <div class="metric-card info">
+            <span class="metric-value">¥{{ "%.2f"|format(total_amount) }}</span>
+            <span class="metric-label">总交易额</span>
+            <span class="metric-extra">本周¥{{ "%.2f"|format(amount_this_week) }}</span>
+        </div>
+    </div>
+
+    <!-- 统计数字：一行 12 个小格紧凑 -->
+    <div class="stats-bar">
+        <div class="stats-group">
+            <span class="stats-group-title">图书</span>
+            <span class="stat-mini">在售 <b>{{ available_books }}</b></span>
+            <span class="stat-mini">已售 <b>{{ sold_books }}</b></span>
+            <span class="stat-mini">下架 <b>{{ offline_books }}</b></span>
+            <span class="stat-mini">均价 <b>¥{{ "%.1f"|format(avg_price) }}</b></span>
+        </div>
+        <div class="stats-group">
+            <span class="stats-group-title">用户</span>
+            <span class="stat-mini">买家 <b>{{ total_buyers }}</b></span>
+            <span class="stat-mini">卖家 <b>{{ total_sellers }}</b></span>
+            <span class="stat-mini">认证 <b>{{ verified_sellers }}</b></span>
+            <span class="stat-mini">月活 <b>{{ active_users }}</b></span>
+        </div>
+        <div class="stats-group">
+            <span class="stats-group-title">交易</span>
+            <span class="stat-mini">待处理 <b>{{ pending_transactions }}</b></span>
+            <span class="stat-mini">已完成 <b>{{ completed_transactions }}</b></span>
+            <span class="stat-mini">待付款 <b>{{ transaction_status_dict.get('accepted', 0) }}</b></span>
+            <span class="stat-mini">已拒绝 <b>{{ transaction_status_dict.get('rejected', 0) }}</b></span>
+        </div>
+    </div>
+
+    <!-- 图表区域：4 个基础数据 ECharts 可视化，2×2 布局（容器需明确宽高才能渲染） -->
+    <div class="charts-section charts-grid-2x2">
+        <div class="chart-card">
+            <div class="chart-header">书籍状态分布</div>
+            <div class="chart-body"><div id="bookStatusChart" class="echart-container" style="width:100%;height:200px;"></div></div>
+        </div>
+        <div class="chart-card">
+            <div class="chart-header">用户类型分布</div>
+            <div class="chart-body"><div id="userTypeChart" class="echart-container" style="width:100%;height:200px;"></div></div>
+        </div>
+        <div class="chart-card">
+            <div class="chart-header">交易状态分布</div>
+            <div class="chart-body"><div id="transactionStatusChart" class="echart-container" style="width:100%;height:200px;"></div></div>
+        </div>
+        <div class="chart-card">
+            <div class="chart-header">交易趋势（近6月）</div>
+            <div class="chart-body"><div id="transactionTrendChart" class="echart-container" style="width:100%;height:200px;"></div></div>
+        </div>
+    </div>
+
+    <!-- 数据表格：紧凑 -->
+    <div class="data-tables-section">
+        <div class="tables-row tables-row-3">
+            <div class="table-card">
+                <div class="table-header">⭐ 最受欢迎书籍</div>
+                {% if top_books %}
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>排名</th>
+                            <th>书名</th>
+                            <th>销量</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for book in top_books %}
+                        <tr>
+                            <td><span class="rank-badge rank-{{ loop.index }}">{{ loop.index }}</span></td>
+                            <td class="book-title">{{ book[1] }}</td>
+                            <td><span class="count-badge">{{ book[2] }}</span></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <div class="no-data">暂无数据</div>
+                {% endif %}
+            </div>
+
+            <div class="table-card">
+                <div class="table-header">🏆 最活跃卖家</div>
+                {% if top_sellers %}
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>排名</th>
+                            <th>卖家</th>
+                            <th>发布书籍</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for seller in top_sellers %}
+                        <tr>
+                            <td><span class="rank-badge rank-{{ loop.index }}">{{ loop.index }}</span></td>
+                            <td>{{ seller[1] }}</td>
+                            <td><span class="count-badge">{{ seller[2] }}</span></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <div class="no-data">暂无数据</div>
+                {% endif %}
+            </div>
+
+            <div class="table-card">
+                <div class="table-header">🛒 最活跃买家</div>
+                {% if top_buyers %}
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>排名</th>
+                            <th>买家</th>
+                            <th>购买次数</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for buyer in top_buyers %}
+                        <tr>
+                            <td><span class="rank-badge rank-{{ loop.index }}">{{ loop.index }}</span></td>
+                            <td>{{ buyer[1] }}</td>
+                            <td><span class="count-badge">{{ buyer[2] }}</span></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <div class="no-data">暂无数据</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="table-card table-card-full">
+            <div class="table-header">📝 最近交易记录</div>
+            {% if recent_transactions %}
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>交易ID</th>
+                        <th>书籍名称</th>
+                        <th>买家</th>
+                        <th>状态</th>
+                        <th>金额</th>
+                        <th>时间</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for transaction in recent_transactions %}
+                    <tr>
+                        <td>#{{ transaction.id }}</td>
+                        <td class="book-title">{{ transaction.book.title if transaction.book else 'N/A' }}</td>
+                        <td>{{ transaction.buyer.username if transaction.buyer else 'N/A' }}</td>
+                        <td>
+                            <span class="status-badge status-{{ transaction.status }}">
+                                {% if transaction.status == 'pending' %}待处理
+                                {% elif transaction.status == 'accepted' %}待付款
+                                {% elif transaction.status == 'paid' %}已付款
+                                {% elif transaction.status == 'rejected' %}已拒绝
+                                {% elif transaction.status == 'completed' %}已完成
+                                {% else %}{{ transaction.status }}
+                                {% endif %}
+                            </span>
+                        </td>
+                        <td class="amount">
+                            {% if transaction.payment_amount %}
+                                ¥{{ "%.2f"|format(transaction.payment_amount) }}
+                            {% else %}
+                                <span class="text-muted">未支付</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ transaction.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="no-data">暂无交易记录</div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- ECharts：使用本地 static 文件，避免 CDN 返回非 JS 导致 SyntaxError -->
+<script src="{{ url_for('static', filename='js/echarts.min.js') }}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var el = document.getElementById('updateTime');
+    if (el) {
+        var d = new Date();
+        el.textContent = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0') + ' ' + String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+    }
+    function runCharts() {
+        if (typeof echarts === 'undefined') {
+            setTimeout(runCharts, 100);
+            return;
+        }
+        var colors = {
+            primary: '#6366f1',
+            success: '#10b981',
+            warning: '#f59e0b',
+            danger: '#ef4444',
+            info: '#3b82f6',
+            purple: '#8b5cf6',
+            pink: '#ec4899',
+            cyan: '#06b6d4'
+        };
+        var bookStatusEl = document.getElementById('bookStatusChart');
+        if (!bookStatusEl) return;
+        var bookStatusChart = echarts.init(bookStatusEl);
+    bookStatusChart.setOption({
+        tooltip: {
+            trigger: 'item',
+            formatter: '{b}: {c} ({d}%)'
+        },
+        legend: {
+            orient: 'vertical',
+            left: 'left',
+            top: 'center'
+        },
+        series: [{
+            type: 'pie',
+            radius: ['40%', '70%'],
+            avoidLabelOverlap: false,
+            itemStyle: {
+                borderRadius: 10,
+                borderColor: '#fff',
+                borderWidth: 2
+            },
+            label: {
+                show: true,
+                formatter: '{b}: {d}%'
+            },
+            emphasis: {
+                label: {
+                    show: true,
+                    fontSize: 14,
+                    fontWeight: 'bold'
+                }
+            },
+            data: [
+                { value: {{ available_books }}, name: '在售', itemStyle: { color: colors.success } },
+                { value: {{ sold_books }}, name: '已售出', itemStyle: { color: colors.danger } },
+                { value: {{ offline_books }}, name: '已下架', itemStyle: { color: colors.warning } }
+            ]
+        }]
+    });
+
+    // 用户类型分布 - 环形图
+    const userTypeChart = echarts.init(document.getElementById('userTypeChart'));
+    userTypeChart.setOption({
+        tooltip: {
+            trigger: 'item',
+            formatter: '{b}: {c} ({d}%)'
+        },
+        legend: {
+            orient: 'vertical',
+            left: 'left',
+            top: 'center'
+        },
+        series: [{
+            type: 'pie',
+            radius: ['40%', '70%'],
+            center: ['60%', '50%'],
+            avoidLabelOverlap: false,
+            itemStyle: {
+                borderRadius: 10,
+                borderColor: '#fff',
+                borderWidth: 2
+            },
+            label: {
+                show: true,
+                formatter: '{b}: {d}%'
+            },
+            data: [
+                { value: {{ total_buyers }}, name: '买家', itemStyle: { color: colors.info } },
+                { value: {{ (total_sellers - verified_sellers) if total_sellers >= verified_sellers else 0 }}, name: '普通卖家', itemStyle: { color: colors.warning } },
+                { value: {{ verified_sellers }}, name: '认证卖家', itemStyle: { color: colors.success } }
+            ]
+        }]
+    });
+
+    // 交易状态分布 - 饼图
+    const transactionStatusChart = echarts.init(document.getElementById('transactionStatusChart'));
+    transactionStatusChart.setOption({
+        tooltip: {
+            trigger: 'item',
+            formatter: '{b}: {c} ({d}%)'
+        },
+        legend: {
+            orient: 'vertical',
+            left: 'left',
+            top: 'center'
+        },
+        series: [{
+            type: 'pie',
+            radius: ['40%', '70%'],
+            center: ['60%', '50%'],
+            avoidLabelOverlap: false,
+            itemStyle: {
+                borderRadius: 10,
+                borderColor: '#fff',
+                borderWidth: 2
+            },
+            label: {
+                show: true,
+                formatter: '{b}: {d}%'
+            },
+            data: [
+                { value: {{ transaction_status_dict.get('pending', 0) }}, name: '待处理', itemStyle: { color: colors.warning } },
+                { value: {{ transaction_status_dict.get('accepted', 0) }}, name: '待付款', itemStyle: { color: colors.info } },
+                { value: {{ transaction_status_dict.get('paid', 0) }}, name: '已付款', itemStyle: { color: colors.primary } },
+                { value: {{ transaction_status_dict.get('completed', 0) }}, name: '已完成', itemStyle: { color: colors.success } },
+                { value: {{ transaction_status_dict.get('rejected', 0) }}, name: '已拒绝', itemStyle: { color: colors.danger } }
+            ]
+        }]
+    });
+
+    // 交易趋势 - 双轴折线图
+    const transactionTrendChart = echarts.init(document.getElementById('transactionTrendChart'));
+    const months = {{ monthly_transactions | map(attribute='month') | list | tojson }};
+    const transactionCounts = {{ monthly_transactions | map(attribute='count') | list | tojson }};
+    const transactionAmounts = {{ monthly_transactions | map(attribute='amount') | list | tojson }};
+
+    transactionTrendChart.setOption({
+        tooltip: {
+            trigger: 'axis',
+            axisPointer: { type: 'cross' }
+        },
+        legend: {
+            data: ['交易笔数', '交易金额'],
+            top: 0
+        },
+        grid: {
+            left: '3%',
+            right: '4%',
+            bottom: '3%',
+            containLabel: true
+        },
+        xAxis: {
+            type: 'category',
+            boundaryGap: false,
+            data: months,
+            axisLine: { lineStyle: { color: '#e5e7eb' } },
+            axisLabel: { color: '#6b7280' }
+        },
+        yAxis: [
+            {
+                type: 'value',
+                name: '交易笔数',
+                axisLine: { show: false },
+                axisLabel: { color: '#6b7280' },
+                splitLine: { lineStyle: { color: '#f3f4f6' } }
+            },
+            {
+                type: 'value',
+                name: '交易金额(元)',
+                axisLine: { show: false },
+                axisLabel: { color: '#6b7280', formatter: '¥{value}' },
+                splitLine: { show: false }
+            }
+        ],
+        series: [
+            {
+                name: '交易笔数',
+                type: 'line',
+                smooth: true,
+                data: transactionCounts,
+                itemStyle: { color: colors.primary },
+                areaStyle: {
+                    color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                        { offset: 0, color: 'rgba(99, 102, 241, 0.3)' },
+                        { offset: 1, color: 'rgba(99, 102, 241, 0.05)' }
+                    ])
+                }
+            },
+            {
+                name: '交易金额',
+                type: 'line',
+                yAxisIndex: 1,
+                smooth: true,
+                data: transactionAmounts,
+                itemStyle: { color: colors.success },
+                areaStyle: {
+                    color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                        { offset: 0, color: 'rgba(16, 185, 129, 0.3)' },
+                        { offset: 1, color: 'rgba(16, 185, 129, 0.05)' }
+                    ])
+                }
+            }
+        ]
+    });
+
+        // 响应式调整（仅 4 个基础图表）
+        var allCharts = [bookStatusChart, userTypeChart, transactionStatusChart, transactionTrendChart];
+        window.addEventListener('resize', function() {
+            allCharts.forEach(function(ch) { if (ch) ch.resize(); });
+        });
+        setTimeout(function() { allCharts.forEach(function(ch) { if (ch) ch.resize(); }); }, 200);
+    }
+    runCharts();
+});
+</script>
+
+<style>
+/* 紧凑布局 */
+.admin-dashboard {
+    padding: 12px 0;
+    background: #f1f5f9;
+    min-height: calc(100vh - 100px);
+}
+
+/* 顶部一行：标题 + 导航 + 时间 */
+.dashboard-top { display:none; }
+
+/* 核心指标：一行 4 卡紧凑 */
+.metrics-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-bottom: 12px;
+}
+.metric-card {
+    padding: 12px 14px;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.metric-card .metric-value {
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: #1e293b;
+}
+.metric-card .metric-label {
+    font-size: 0.75rem;
+    color: #64748b;
+}
+.metric-card .metric-extra {
+    font-size: 0.7rem;
+    color: #10b981;
+}
+.metric-card.primary .metric-value { color: #4f46e5; }
+.metric-card.success .metric-value { color: #059669; }
+.metric-card.warning .metric-value { color: #d97706; }
+.metric-card.info .metric-value { color: #2563eb; }
+
+/* 统计条：一行三组紧凑 */
+.stats-bar {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 12px;
+    padding: 10px 14px;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+}
+.stats-group {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px 14px;
+    flex: 1;
+}
+.stats-group-title {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #475569;
+    margin-right: 4px;
+}
+.stat-mini {
+    font-size: 0.8rem;
+    color: #64748b;
+}
+.stat-mini b {
+    color: #1e293b;
+    font-weight: 600;
+}
+
+/* 图表区：4 个基础图 2×2 紧凑布局 */
+.charts-section {
+    margin-bottom: 12px;
+}
+.charts-grid-2x2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+.charts-grid-2x2 .chart-card {
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+.charts-grid-2x2 .chart-header {
+    padding: 8px 12px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #334155;
+    border-bottom: 1px solid #f1f5f9;
+}
+.charts-grid-2x2 .chart-body {
+    padding: 8px;
+    height: 220px;
+    flex: 1;
+    min-height: 0;
+}
+.charts-grid-2x2 .echart-container {
+    width: 100%;
+    height: 100%;
+    min-height: 200px;
+}
+.chart-card {
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+    overflow: hidden;
+}
+.chart-header {
+    padding: 8px 12px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #334155;
+    border-bottom: 1px solid #f1f5f9;
+}
+.chart-body {
+    padding: 8px;
+    min-height: 0;
+}
+.echart-container {
+    width: 100%;
+    height: 100%;
+    min-height: 180px;
+}
+
+/* 表格区紧凑 */
+.data-tables-section {
+    margin-bottom: 12px;
+}
+.tables-row {
+    display: grid;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+.tables-row-3 { grid-template-columns: repeat(3, 1fr); }
+.table-card {
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+    overflow: hidden;
+}
+.table-card-full { grid-column: 1 / -1; }
+.table-header {
+    padding: 8px 12px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #334155;
+    border-bottom: 1px solid #f1f5f9;
+}
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8rem;
+}
+.data-table th {
+    padding: 8px 10px;
+    text-align: left;
+    font-weight: 600;
+    color: #64748b;
+    background: #f8fafc;
+}
+.data-table td {
+    padding: 8px 10px;
+    border-bottom: 1px solid #f1f5f9;
+    color: #475569;
+}
+.data-table tbody tr:hover { background: #f8fafc; }
+.rank-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    font-size: 0.7rem;
+    font-weight: 600;
+    background: #e2e8f0;
+    color: #64748b;
+}
+.rank-badge.rank-1 { background: #f59e0b; color: #fff; }
+.rank-badge.rank-2 { background: #94a3b8; color: #fff; }
+.rank-badge.rank-3 { background: #b45309; color: #fff; }
+.book-title {
+    max-width: 140px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.count-badge {
+    padding: 2px 6px;
+    background: #e0e7ff;
+    color: #4f46e5;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+.status-badge {
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 0.7rem;
+    font-weight: 600;
+}
+.status-pending { background: #fef3c7; color: #92400e; }
+.status-accepted { background: #dbeafe; color: #1e40af; }
+.status-paid { background: #d1fae5; color: #065f46; }
+.status-rejected { background: #fee2e2; color: #991b1b; }
+.status-completed { background: #d1fae5; color: #065f46; }
+.amount { font-weight: 600; color: #059669; }
+.text-muted { color: #94a3b8; }
+.no-data { padding: 20px; text-align: center; color: #94a3b8; font-size: 0.85rem; }
+
+@media (max-width: 992px) {
+    .charts-grid-2x2 { grid-template-columns: 1fr; }
+    .tables-row-3 { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 768px) {
+    .dashboard-top { flex-wrap: wrap; }
+    .metrics-row { grid-template-columns: repeat(2, 1fr); }
+    .stats-bar { flex-direction: column; }
+    .charts-grid-2x2 { grid-template-columns: 1fr; }
+    .tables-row-3 { grid-template-columns: 1fr; }
+}
+</style>
+{% endblock %}
